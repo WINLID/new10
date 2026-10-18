@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SimOS — Desktop simulato</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      color: #f4f7fb;
+      background: #12314b;
+      overflow: hidden;
+    }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    #desktop {
+      height: calc(100% - 48px);
+      padding: 22px;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(62,160,191,.8), transparent 42%),
+        linear-gradient(135deg, #174567, #112238 72%);
+    }
+    .desktop-icons { display: flex; flex-direction: column; gap: 8px; width: 90px; }
+    .desktop-icon {
+      border: 1px solid transparent;
+      background: transparent;
+      color: white;
+      padding: 9px 4px;
+      border-radius: 5px;
+      text-align: center;
+      text-shadow: 0 1px 3px #000;
+      width: 82px;
+    }
+    .desktop-icon:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.25); }
+    .desktop-icon .emoji { display: block; font-size: 30px; margin-bottom: 4px; }
+    #taskbar {
+      height: 48px;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      background: rgba(12,20,31,.94);
+      border-top: 1px solid rgba(255,255,255,.16);
+      z-index: 1000;
+    }
+    #start-button {
+      height: 100%; width: 58px; border: 0; color: white;
+      background: #176e9b; font-size: 23px;
+    }
+    #start-button:hover { background: #2188b6; }
+    #task-buttons { display: flex; flex: 1; height: 100%; }
+    .task-button {
+      color: white; background: transparent; border: 0;
+      padding: 0 16px; border-right: 1px solid rgba(255,255,255,.1);
+    }
+    .task-button:hover { background: rgba(255,255,255,.12); }
+    #clock { padding: 0 16px; font-size: 13px; text-align: right; }
+    #start-menu {
+      position: fixed; display: none; left: 0; bottom: 48px; width: 300px;
+      background: rgba(16,31,47,.98); border: 1px solid rgba(255,255,255,.2);
+      box-shadow: 0 8px 30px rgba(0,0,0,.4); z-index: 1100; padding: 10px;
+    }
+    #start-menu.open { display: block; }
+    #start-menu button {
+      display: block; width: 100%; text-align: left; color: white;
+      background: transparent; border: 0; padding: 12px; border-radius: 4px;
+    }
+    #start-menu button:hover { background: rgba(255,255,255,.12); }
+    .window {
+      position: absolute; top: 70px; left: 130px;
+      width: 600px; height: 410px; min-width: 320px; min-height: 220px;
+      display: none; flex-direction: column; overflow: hidden;
+      background: #f4f6f8; color: #1d2730;
+      border: 1px solid rgba(0,0,0,.35); border-radius: 5px;
+      box-shadow: 0 12px 35px rgba(0,0,0,.38);
+      z-index: 10;
+    }
+    .window.active { display: flex; }
+    .titlebar {
+      height: 38px; flex: 0 0 38px; display: flex; align-items: center;
+      justify-content: space-between; padding-left: 12px;
+      background: #176e9b; color: white; cursor: move; user-select: none;
+    }
+    .titlebar button {
+      height: 38px; width: 44px; border: 0; color: white; background: transparent;
+    }
+    .titlebar button:hover { background: #c74747; }
+    .window-content { padding: 14px; overflow: auto; flex: 1; }
+    .toolbar { display: flex; gap: 7px; align-items: center; margin-bottom: 12px; }
+    .toolbar button, .primary {
+      padding: 7px 11px; border: 1px solid #b9c3ca; border-radius: 3px;
+      background: white; color: #1d2730;
+    }
+    .toolbar button:hover, .primary:hover { background: #e8f2f7; }
+    .file-layout { display: flex; height: 100%; min-height: 230px; }
+    .sidebar { width: 145px; flex: 0 0 145px; border-right: 1px solid #d6dce1; padding-right: 8px; }
+    .sidebar button {
+      display: block; border: 0; background: transparent; width: 100%;
+      text-align: left; padding: 9px 7px; color: #263746;
+    }
+    .sidebar button:hover { background: #e5eef3; }
+    #file-list { flex: 1; padding: 4px 12px; }
+    .file-row {
+      padding: 9px; border-bottom: 1px solid #e7eaed; cursor: pointer;
+    }
+    .file-row:hover { background: #e9f3f8; }
+    .file-row small { color: #687783; }
+    textarea#note-text {
+      width: 100%; height: 100%; min-height: 230px; resize: none;
+      border: 1px solid #cbd3d9; padding: 12px; outline: none;
+      color: #18242d; background: white;
+    }
+    .sys-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .sys-card {
+      flex: 1 1 210px; padding: 13px; background: white;
+      border: 1px solid #dce2e6; border-radius: 4px;
+    }
+    .sys-card h3 { margin: 0 0 9px; font-size: 16px; }
+    .meter { height: 11px; background: #dce3e8; border-radius: 8px; overflow: hidden; }
+    .meter span { display: block; height: 100%; width: 0; background: #26a269; transition: width .4s; }
+    .muted { color: #667580; font-size: 13px; }
+    .status { padding: 7px 10px; background: #eef2f4; color: #56636d; font-size: 12px; }
+    @media (max-width: 650px) {
+      .window { left: 4%; width: 92%; top: 35px; height: calc(100% - 100px); }
+      .sidebar { width: 110px; flex-basis: 110px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="desktop">
+    <div class="desktop-icons">
+      <button class="desktop-icon" onclick="openWindow('files')"><span class="emoji">📁</span>Esplora file</button>
+      <button class="desktop-icon" onclick="openWindow('note')"><span class="emoji">📝</span>Blocco note</button>
+      <button class="desktop-icon" onclick="openWindow('system')"><span class="emoji">⚙️</span>Sistema</button>
+    </div>
+  </div>
+
+  <div id="start-menu">
+    <button onclick="openWindow('files')">📁 &nbsp; Esplora file</button>
+    <button onclick="openWindow('note')">📝 &nbsp; Blocco note</button>
+    <button onclick="openWindow('system')">⚙️ &nbsp; Informazioni e prestazioni</button>
+    <div class="status">Simulazione: i dati esistono solo finché questa pagina resta aperta.</div>
+  </div>
+
+  <section class="window" id="win-files">
+    <div class="titlebar" onmousedown="startDrag(event, 'win-files')">
+      <span>Esplora file — Questo PC</span>
+      <button onclick="closeWindow('files')">×</button>
+    </div>
+    <div class="window-content">
+      <div class="toolbar">
+        <button onclick="newTextFile()">＋ Nuovo file di testo</button>
+        <button onclick="newFolder()">＋ Nuova cartella</button>
+      </div>
+      <div class="file-layout">
+        <div class="sidebar">
+          <button onclick="showFolder('Desktop')">🖥 Desktop</button>
+          <button onclick="showFolder('Documenti')">📄 Documenti</button>
+          <button onclick="showFolder('Immagini')">🖼 Immagini</button>
+          <button onclick="showFolder('Cestino')">🗑 Cestino</button>
+        </div>
+        <div id="file-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="window" id="win-note">
+    <div class="titlebar" onmousedown="startDrag(event, 'win-note')">
+      <span>Blocco note — solo RAM</span>
+      <button onclick="closeWindow('note')">×</button>
+    </div>
+    <div class="window-content" style="display:flex; flex-direction:column;">
+      <div class="toolbar">
+        <button onclick="saveNoteToRam()">Salva nella simulazione</button>
+        <span class="muted" id="note-info">Nessun file aperto</span>
+      </div>
+      <textarea id="note-text" placeholder="Scrivi qui. Il contenuto non viene salvato sul PC."></textarea>
+    </div>
+  </section>
+
+  <section class="window" id="win-system">
+    <div class="titlebar" onmousedown="startDrag(event, 'win-system')">
+      <span>Informazioni e prestazioni</span>
+      <button onclick="closeWindow('system')">×</button>
+    </div>
+    <div class="window-content">
+      <div class="sys-grid">
+        <div class="sys-card">
+          <h3>Informazioni di sistema</h3>
+          <div>Nome: SimOS Web</div><div>Versione: 1.0</div>
+          <div>Modalità: simulazione locale</div>
+          <p class="muted">Non rileva l’hardware reale del dispositivo.</p>
+        </div>
+        <div class="sys-card">
+          <h3>RAM simulata <span id="ram-value"></span></h3>
+          <div class="meter"><span id="ram-bar"></span></div>
+          <p class="muted">Stima indicativa dei dati creati in questa pagina.</p>
+        </div>
+        <div class="sys-card">
+          <h3>CPU simulata <span id="cpu-value"></span></h3>
+          <div class="meter"><span id="cpu-bar"></span></div>
+          <p class="muted">Valore casuale dimostrativo, non misura la CPU reale.</p>
+        </div>
+        <div class="sys-card">
+          <h3>GPU simulata <span id="gpu-value"></span></h3>
+          <div class="meter"><span id="gpu-bar"></span></div>
+          <p class="muted">Valore casuale dimostrativo, non misura la GPU reale.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="taskbar">
+    <button id="start-button" onclick="toggleStart()">⊞</button>
+    <div id="task-buttons"></div>
+    <div id="clock"></div>
+  </div>
+
+  <script>
+    (function () {
+      var files = [
+        { name: "Benvenuto.txt", type: "file", folder: "Documenti", content: "Benvenuto in SimOS!\\nQuesto file esiste solo nella memoria della pagina." },
+        { name: "Appunti.txt", type: "file", folder: "Desktop", content: "I tuoi appunti temporanei." },
+        { name: "Immagine-demo.png", type: "file", folder: "Immagini", content: "" }
+      ];
+      var currentFolder = "Documenti";
+      var openFileName = null;
+      var zTop = 20;
+
+      window.openWindow = function (name) {
+        var win = document.getElementById("win-" + name);
+        win.className = "window active";
+        win.style.zIndex = ++zTop;
+        document.getElementById("start-menu").className = "";
+        renderTaskButtons();
+        if (name === "files") showFolder(currentFolder);
+      };
+      window.closeWindow = function (name) {
+        document.getElementById("win-" + name).className = "window";
+        renderTaskButtons();
+      };
+      window.toggleStart = function () {
+        var menu = document.getElementById("start-menu");
+        menu.className = menu.className === "open" ? "" : "open";
+      };
+      window.showFolder = function (folder) {
+        currentFolder = folder;
+        var list = document.getElementById("file-list");
+        var html = "<div class='muted'>Cartella: " + escapeHtml(folder) + "</div>";
+        var found = false;
+        for (var i = 0; i < files.length; i++) {
+          if (files[i].folder === folder) {
+            found = true;
+            html += "<div class='file-row' data-index='" + i + "'><strong>" +
+              (files[i].type === "folder" ? "📁 " : "📄 ") + escapeHtml(files[i].name) +
+              "</strong><br><small>" + (files[i].type === "folder" ? "Cartella" : "File temporaneo") +
+              " · solo RAM</small></div>";
+          }
+        }
+        if (!found) html += "<p class='muted'>Questa cartella è vuota.</p>";
+        list.innerHTML = html;
+        var rows = list.getElementsByClassName("file-row");
+        for (var j = 0; j < rows.length; j++) {
+          rows[j].onclick = function () {
+            var item = files[parseInt(this.getAttribute("data-index"), 10)];
+            if (item.type === "folder") showFolder(item.name);
+            else openTextFile(item);
+          };
+        }
+      };
+      window.newTextFile = function () {
+        var name = prompt("Nome del file:", "Nuovo file.txt");
+        if (!name) return;
+        files.push({ name: name, type: "file", folder: currentFolder, content: "" });
+        showFolder(currentFolder); updateRam();
+      };
+      window.newFolder = function () {
+        var name = prompt("Nome della cartella:", "Nuova cartella");
+        if (!name) return;
+        files.push({ name: name, type: "folder", folder: currentFolder, content: "" });
+        showFolder(currentFolder); updateRam();
+      };
+      window.openTextFile = function (item) {
+        openFileName = item.name;
+        document.getElementById("note-text").value = item.content || "";
+        document.getElementById("note-info").innerHTML = "File: " + escapeHtml(item.name) + " (solo RAM)";
+        openWindow("note");
+      };
+      window.saveNoteToRam = function () {
+        var text = document.getElementById("note-text").value;
+        if (openFileName) {
+          for (var i = 0; i < files.length; i++) {
+            if (files[i].name === openFileName) { files[i].content = text; break; }
+          }
+        } else {
+          var name = prompt("Nome del file:", "Appunti.txt");
+          if (!name) return;
+          files.push({ name: name, type: "file", folder: "Documenti", content: text });
+          openFileName = name;
+        }
+        document.getElementById("note-info").innerHTML = "Modifiche in memoria volatile";
+        updateRam();
+      };
+      window.startDrag = function (event, id) {
+        if (event.target && event.target.tagName === "BUTTON") return;
+        var win = document.getElementById(id);
+        win.style.zIndex = ++zTop;
+        var startX = event.clientX, startY = event.clientY;
+        var left = win.offsetLeft, top = win.offsetTop;
+        document.onmousemove = function (e) {
+          e = e || window.event;
+          win.style.left = Math.max(0, left + e.clientX - startX) + "px";
+          win.style.top = Math.max(0, top + e.clientY - startY) + "px";
+        };
+        document.onmouseup = function () { document.onmousemove = null; document.onmouseup = null; };
+        if (event.preventDefault) event.preventDefault();
+      };
+
+      function escapeHtml(value) {
+        return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+      function renderTaskButtons() {
+        var names = ["files", "note", "system"];
+        var labels = { files: "Esplora file", note: "Blocco note", system: "Sistema" };
+        var html = "";
+        for (var i = 0; i < names.length; i++) {
+          if (document.getElementById("win-" + names[i]).className.indexOf("active") !== -1) {
+            html += "<button class='task-button' onclick=\"openWindow('" + names[i] + "')\">" + labels[names[i]] + "</button>";
+          }
+        }
+        document.getElementById("task-buttons").innerHTML = html;
+      }
+      function updateRam() {
+        var bytes = 0;
+        for (var i = 0; i < files.length; i++) bytes += files[i].name.length * 2 + (files[i].content || "").length * 2 + 80;
+        var percent = Math.min(100, Math.max(3, Math.round(bytes / 300)));
+        document.getElementById("ram-value").innerHTML = percent + "%";
+        document.getElementById("ram-bar").style.width = percent + "%";
+      }
+      function updateMeters() {
+        var values = [
+          { value: Math.floor(Math.random() * 76) + 8, bar: "cpu-bar", label: "cpu-value" },
+          { value: Math.floor(Math.random() * 66) + 12, bar: "gpu-bar", label: "gpu-value" }
+        ];
+        for (var i = 0; i < values.length; i++) {
+          document.getElementById(values[i].bar).style.width = values[i].value + "%";
+          document.getElementById(values[i].label).innerHTML = values[i].value + "%";
+        }
+        updateRam();
+      }
+      function updateClock() {
+        var now = new Date();
+        var h = ("0" + now.getHours()).slice(-2);
+        var m = ("0" + now.getMinutes()).slice(-2);
+        document.getElementById("clock").innerHTML = h + ":" + m + "<br>" +
+          ("0" + now.getDate()).slice(-2) + "/" + ("0" + (now.getMonth() + 1)).slice(-2) + "/" + now.getFullYear();
+      }
+      updateClock(); updateMeters(); showFolder(currentFolder);
+      window.setInterval(updateClock, 1000);
+      window.setInterval(updateMeters, 1800);
+    }());
+  </script>
+</body>
+</html>
